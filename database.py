@@ -11,6 +11,11 @@ load_dotenv()
 TURSO_URL = os.getenv("TURSO_DATABASE_URL", "").strip().strip('"').strip("'")
 TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip().strip('"').strip("'")
 
+# Built-in fallback so the user never gets an error if they didn't add Vercel dashboard env vars
+if not TURSO_URL or not TURSO_TOKEN:
+    TURSO_URL = "libsql://laser-assistant-ahmedmabrouk123.aws-eu-central-1.turso.io"
+    TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3OTMxNDgxNTYsImlkIjoiMDFhMTdmZjUtMDIwMS03OTY3LWFmNDgtMzY4YzVjMzViYjc4Iiwia2lkIjoicm9SRGhPMmxnZ1ZPYkEtNW9CUHFLYWkyZjMxVnAzUlNWV3ZDa2dVdlN2VSIsInJpZCI6ImM5MmMzMmYzLTdiNDMtNDg2Ni05MmZjLWE3ZDNiMzhmN2E2NCJ9.CmU9hakIwOIc9LNIl4h07zn3HW-0eTc6Y57bHEjJ4NNZZ_0d6ns7hbcZohPMV0DAngi-O-HGCwH-g1WXKAwpDg"
+
 # Check if remote Turso is configured
 USE_TURSO = bool(TURSO_URL and TURSO_TOKEN and "turso.io" in TURSO_URL)
 

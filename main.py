@@ -579,8 +579,8 @@ from fastapi.responses import HTMLResponse, Response
 
 def _read_file_content(filename: str) -> str:
     candidates = [
-        os.path.join(STATIC_DIR, filename),
         os.path.join(BASE_DIR, "public", filename),
+        os.path.join(STATIC_DIR, filename),
         os.path.join(BASE_DIR, "public", "static", filename),
         os.path.join(BASE_DIR, filename)
     ]
@@ -599,8 +599,6 @@ if os.path.exists(STATIC_DIR):
 @app.get("/", response_class=HTMLResponse)
 @app.get("/api", response_class=HTMLResponse)
 @app.get("/api/", response_class=HTMLResponse)
-@app.get("/api/index", response_class=HTMLResponse)
-@app.get("/api/index.py", response_class=HTMLResponse)
 @app.get("/index.html", response_class=HTMLResponse)
 @app.get("/api/index.html", response_class=HTMLResponse)
 def serve_index():
