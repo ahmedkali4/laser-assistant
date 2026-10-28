@@ -573,34 +573,71 @@ def calculate_laser(req: CalculatorRequest):
     }
 
 
-# Serve static web frontend
+# --- Static & Frontend Serving (Serverless & Local Compatible) ---
+
+from fastapi.responses import HTMLResponse, Response
+
+def _read_file_content(filename: str) -> str:
+    candidates = [
+        os.path.join(STATIC_DIR, filename),
+        os.path.join(BASE_DIR, "public", filename),
+        os.path.join(BASE_DIR, "public", "static", filename),
+        os.path.join(BASE_DIR, filename)
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return f.read()
+            except Exception:
+                pass
+    return ""
+
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
+@app.get("/api", response_class=HTMLResponse)
+@app.get("/api/", response_class=HTMLResponse)
+@app.get("/api/index", response_class=HTMLResponse)
+@app.get("/api/index.py", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+@app.get("/api/index.html", response_class=HTMLResponse)
 def serve_index():
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"message": "Laser Assistant API is running"}
+    content = _read_file_content("index.html")
+    if content:
+        return HTMLResponse(content=content)
+    return HTMLResponse(content="<h1>Laser Assistant API is running</h1>")
 
-@app.get("/guide")
-@app.get("/guide.html")
+@app.get("/guide", response_class=HTMLResponse)
+@app.get("/guide.html", response_class=HTMLResponse)
+@app.get("/api/guide", response_class=HTMLResponse)
+@app.get("/api/guide.html", response_class=HTMLResponse)
 def serve_guide():
-    guide_path = os.path.join(STATIC_DIR, "guide.html")
-    if os.path.exists(guide_path):
-        return FileResponse(guide_path)
-    return {"message": "Guide is available in the main app"}
+    content = _read_file_content("guide.html")
+    if content:
+        return HTMLResponse(content=content)
+    return HTMLResponse(content="<h1>Guide is available</h1>")
+
+@app.get("/static/app.js")
+@app.get("/api/static/app.js")
+@app.get("/app.js")
+@app.get("/api/app.js")
+def serve_app_js():
+    content = _read_file_content("app.js")
+    return Response(content=content, media_type="application/javascript")
 
 @app.get("/manifest.json")
+@app.get("/api/manifest.json")
 def serve_manifest():
-    p = os.path.join(STATIC_DIR, "manifest.json")
-    return FileResponse(p) if os.path.exists(p) else {}
+    content = _read_file_content("manifest.json")
+    return Response(content=content, media_type="application/json")
 
 @app.get("/sw.js")
+@app.get("/api/sw.js")
 def serve_sw():
-    p = os.path.join(STATIC_DIR, "sw.js")
-    return FileResponse(p, media_type="application/javascript") if os.path.exists(p) else {}
+    content = _read_file_content("sw.js")
+    return Response(content=content, media_type="application/javascript")
 
 
 
