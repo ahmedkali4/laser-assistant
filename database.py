@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TURSO_URL = os.getenv("TURSO_DATABASE_URL", "")
-TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
+# Clean env variables (strip whitespace and accidental quotes)
+TURSO_URL = os.getenv("TURSO_DATABASE_URL", "").strip().strip('"').strip("'")
+TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip().strip('"').strip("'")
 
 # Check if remote Turso is configured
 USE_TURSO = bool(TURSO_URL and TURSO_TOKEN and "turso.io" in TURSO_URL)
@@ -23,6 +24,13 @@ if USE_TURSO:
 else:
     HTTP_URL = None
     HEADERS = None
+
+# Safe DB path for Serverless / Read-only filesystems (Vercel uses /tmp)
+if os.path.exists("/tmp"):
+    LOCAL_DB_PATH = "/tmp/laser_local.db"
+else:
+    LOCAL_DB_PATH = "laser_local.db"
+
 
 
 def _format_value(val):
@@ -102,7 +110,7 @@ def execute_batch(stmts_with_args: list):
             })
         return results
     else:
-        conn = sqlite3.connect("laser_local.db")
+        conn = sqlite3.connect(LOCAL_DB_PATH)
         cur = conn.cursor()
         results = []
         for item in stmts_with_args:
@@ -155,11 +163,16 @@ def init_db():
             gas_type TEXT DEFAULT 'أكسجين O2',
             estimated_time_min REAL DEFAULT 0.0,
             sheet_fraction REAL DEFAULT 0.0,
+            sheet_weight_kg REAL DEFAULT 0.0,
             material_cost REAL DEFAULT 0.0,
             cutting_cost REAL DEFAULT 0.0,
             extra_cost REAL DEFAULT 0.0,
+            design_fee REAL DEFAULT 0.0,
+            is_rush INTEGER DEFAULT 0,
             total_cost REAL DEFAULT 0.0,
             client_price REAL DEFAULT 0.0,
+            paid_amount REAL DEFAULT 0.0,
+            remaining_amount REAL DEFAULT 0.0,
             net_profit REAL DEFAULT 0.0,
             status TEXT DEFAULT 'design',
             deadline TEXT DEFAULT '',
@@ -170,10 +183,22 @@ def init_db():
         )""",
         """CREATE TABLE IF NOT EXISTS materials_config (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            name TEXT NOT NULL UNIQUE,
             density REAL DEFAULT 7.85,
-            price_per_kg REAL DEFAULT 50.0,
+            price_per_kg REAL DEFAULT 65.0,
             default_gas TEXT DEFAULT 'أكسجين O2'
+        )""",
+        """CREATE TABLE IF NOT EXISTS app_settings (
+            id INTEGER PRIMARY KEY,
+            workshop_name TEXT DEFAULT 'المساعد الشخصي - ورشة الليزر',
+            engineer_name TEXT DEFAULT 'م. التصميم الصناعي',
+            engineer_phone TEXT DEFAULT '',
+            laser_hourly_rate REAL DEFAULT 550.0,
+            oxygen_cost_per_min REAL DEFAULT 2.5,
+            nitrogen_cost_per_min REAL DEFAULT 6.5,
+            air_cost_per_min REAL DEFAULT 0.8,
+            pierce_cost_unit REAL DEFAULT 0.45,
+            rush_fee_percent REAL DEFAULT 25.0
         )""",
         """CREATE TABLE IF NOT EXISTS whatsapp_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,6 +209,54 @@ def init_db():
     ]
 
     execute_batch(queries)
+
+    # Migrations for existing databases to add new columns if missing
+    new_cols = [
+        "ALTER TABLE projects ADD COLUMN design_fee REAL DEFAULT 0.0;",
+        "ALTER TABLE projects ADD COLUMN paid_amount REAL DEFAULT 0.0;",
+        "ALTER TABLE projects ADD COLUMN remaining_amount REAL DEFAULT 0.0;",
+        "ALTER TABLE projects ADD COLUMN is_rush INTEGER DEFAULT 0;",
+        "ALTER TABLE projects ADD COLUMN sheet_weight_kg REAL DEFAULT 0.0;"
+    ]
+    for col_query in new_cols:
+        try:
+            execute(col_query)
+        except Exception:
+            pass # Column already exists
+
+    # Ensure app_settings has row id=1
+    try:
+        set_res = execute("SELECT COUNT(*) as cnt FROM app_settings WHERE id = 1;")
+        if not set_res["rows"] or set_res["rows"][0]["cnt"] == 0:
+            execute("""
+                INSERT INTO app_settings (
+                    id, workshop_name, engineer_name, engineer_phone,
+                    laser_hourly_rate, oxygen_cost_per_min, nitrogen_cost_per_min,
+                    air_cost_per_min, pierce_cost_unit, rush_fee_percent
+                ) VALUES (1, 'المساعد الشخصي لقص المعادن بالليزر', 'مهندس التصميم الصناعي', '', 550.0, 2.5, 6.5, 0.8, 0.45, 25.0);
+            """)
+    except Exception as e:
+        print("Settings init note:", e)
+
+    # Populate default materials if empty
+    try:
+        mat_res = execute("SELECT COUNT(*) as cnt FROM materials_config;")
+        if not mat_res["rows"] or mat_res["rows"][0]["cnt"] == 0:
+            default_mats = [
+                ("صاج حديد أسود", 7.85, 65.0, "أكسجين O2"),
+                ("صاج استانلس 304", 8.0, 195.0, "نيتروجين N2"),
+                ("ألومنيوم", 2.7, 190.0, "نيتروجين N2"),
+                ("صاج مجلفن", 7.85, 75.0, "أكسجين O2"),
+                ("نحاس أصفر / أحمر", 8.9, 380.0, "نيتروجين N2")
+            ]
+            for m in default_mats:
+                execute(
+                    "INSERT INTO materials_config (name, density, price_per_kg, default_gas) VALUES (?, ?, ?, ?);",
+                    list(m)
+                )
+    except Exception as e:
+        print("Materials init note:", e)
+
 
     # Populate default templates if empty
     res = execute("SELECT COUNT(*) as cnt FROM whatsapp_templates;")

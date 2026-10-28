@@ -1,0 +1,21 @@
+{
+  "name": "المساعد الشخصي - تقطيع المعادن بالليزر",
+  "short_name": "المساعد الشخصي",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3662/3662817.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3662/3662817.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
